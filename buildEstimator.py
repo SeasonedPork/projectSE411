@@ -21,13 +21,14 @@ class BuildEstimator:
 
     @staticmethod
     def createBlindTestSamples():
-        df_train = data[["OverallQual","GrLivArea","GarageCars","FullBath","TotalBsmtSF","YearBuilt","SalePrice"]]
-        df_test = test_data[["OverallQual","GrLivArea","GarageCars","FullBath","TotalBsmtSF","YearBuilt"]]
 
         # Your existing code for creating blind test samples
         data = pd.read_csv("api/lib/data/train.csv")
         test_data = pd.read_csv("api/lib/data/test.csv")
-        df = data.drop("Id", axis=1)
+        df_train = data[["OverallQual","GrLivArea","GarageCars","FullBath","TotalBsmtSF","YearBuilt","SalePrice"]]
+        df_test = test_data[["OverallQual","GrLivArea","GarageCars","FullBath","TotalBsmtSF","YearBuilt"]]
+        df = data
+
         # ... (continue with your data preprocessing steps)
 
         # Save label encoding information
@@ -39,7 +40,7 @@ class BuildEstimator:
 
         # Save processed data to train.csv and test.csv
         df_train, df_test = train_test_split(df, test_size=0.3)
-        df_train.to_csv('api/lib/data/train/csv', index=False)
+        df_train.to_csv('api/lib/data/train.csv', index=False)
         df_test.to_csv('api/lib/data/test.csv', index=False)
 
     @staticmethod
@@ -74,14 +75,47 @@ class BuildEstimator:
         print(model.summary())
 
         scale = StandardScaler()
-        X_train = df_train[["Id"]]
+        X_train = df_train[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
         y = df_train[["SalePrice"]]
+        X_train = scale.fit_transform(X_train)
+        y = df_train["SalePrice"].values
+        seed = 7
+        np.random.seed(seed)
+        #split into 67% for train and 33% for test
+        #The train_test_split part is a tool that will pick the data and randomize it 
+        #it come from the sklearn.model_selection
+        X_train, X_test, Y_train, Y_test = train_test_split(X_train, y, test_size=0.33,random_state = seed)
+        #Evaluation Process
 
-        # ... (continue with your neural network training code)
+        # Train:
+        loss = 'mse'
+        metric = 'mae'
+        #accurate epoch is 1750 but due to low CPU use low Epochs
+        epochs = 2000
+        model.compile(loss=loss, optimizer='adam', metrics=[metric])
+        model.fit(X_train, Y_train, epochs=epochs, batch_size=128, verbose=1, validation_data=(X_test, Y_test))
 
+        fit = pd.read_csv('api/lib/data/train.csv')
+        Xfit = fit[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
+        Yfit = fit[["SalePrice"]]
+
+        blindTest = pd.read_csv('api/lib/data/test.csv')
+        XBlindtest = blindTest[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
+        print("X_test shape:", X_test.shape)
+        print("blindTest shape:", blindTest.shape)
+        blindTest["SalePrice"] = model.predict(X_test)
+        YBlindtest = blindTest[["SalePrice"]]
+
+        optimizedModel = BuildEstimator.getBestPipeline(Xfit,Yfit).best_estimator_
+        yPredFit = optimizedModel.predict(Xfit)
+        yPredTest = optimizedModel.predict(XBlindtest)
+
+        fit_score = mean_squared_error(Yfit,yPredFit)
+        test_score = mean_squared_error(YBlindtest,yPredTest)
+        print("Fit mse = %.2f and test mse - %.2f"%(fit_score,test_score))
         # Save the trained model to flavors_of_cacao.pickle
         file = open('api/lib/model/flavors_of_cacao.pickle', 'wb')
-        pickle.dump(model, file)
+        pickle.dump(optimizedModel, file)
         file.close()
 
 # Main part of the code
@@ -91,10 +125,5 @@ if __name__ == '__main__':
 
     df_train = pd.read_csv('api/lib/data/train.csv')
     df_test = pd.read_csv('api/lib/data/test.csv')
-
-    X_fit = df_train.drop(['y'], axis=1)
-    y_fit = df_train['y']
-    X_blind_test = df_test.drop(['y'], axis=1)
-    y_blind_test = df_test['y']
 
     build_estimator.createModel()

@@ -66,44 +66,12 @@ class BuildEstimator:
 
     @staticmethod
     def createModel():
-        # Your existing code for creating and training the neural network
-        model = Sequential()
-        model.add(Input(shape=(5,)))
-        model.add(Dense(200, activation='relu'))
-        model.add(Dense(200, activation='relu'))
-        model.add(Dense(1, activation='relu'))
-        print(model.summary())
-
-        scale = StandardScaler()
-        X_train = df_train[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
-        y = df_train[["SalePrice"]]
-        X_train = scale.fit_transform(X_train)
-        y = df_train["SalePrice"].values
-        seed = 7
-        np.random.seed(seed)
-        #split into 67% for train and 33% for test
-        #The train_test_split part is a tool that will pick the data and randomize it 
-        #it come from the sklearn.model_selection
-        X_train, X_test, Y_train, Y_test = train_test_split(X_train, y, test_size=0.33,random_state = seed)
-        #Evaluation Process
-
-        # Train:
-        loss = 'mse'
-        metric = 'mae'
-        #accurate epoch is 1750 but due to low CPU use low Epochs
-        epochs = 2000
-        model.compile(loss=loss, optimizer='adam', metrics=[metric])
-        model.fit(X_train, Y_train, epochs=epochs, batch_size=128, verbose=1, validation_data=(X_test, Y_test))
-
         fit = pd.read_csv('api/lib/data/train.csv')
         Xfit = fit[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
         Yfit = fit[["SalePrice"]]
 
         blindTest = pd.read_csv('api/lib/data/test.csv')
         XBlindtest = blindTest[["OverallQual","GrLivArea","GarageCars","FullBath","YearBuilt"]]
-        print("X_test shape:", X_test.shape)
-        print("blindTest shape:", blindTest.shape)
-        blindTest["SalePrice"] = model.predict(X_test)
         YBlindtest = blindTest[["SalePrice"]]
 
         optimizedModel = BuildEstimator.getBestPipeline(Xfit,Yfit).best_estimator_
